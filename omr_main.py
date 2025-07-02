@@ -19,7 +19,7 @@ imgAns_list = [
     img[704:1658, 350:486],
     img[704:1658, 555:690],
     img[704:1658, 761:898],
-    img[704:1658, 967:1658]
+    img[704:1614, 967:1103]
 ]
 imgAns_list = [cv2.resize(ans, (600, 600)) for ans in imgAns_list]
 
@@ -44,9 +44,28 @@ for idx, thresh_img in enumerate(thresholded_ans_list):
 
 print(f"Total bubbles extracted: {len(all_cells)}")  # should print 200
 
-# Optional: display first few cells
-for i, cell in enumerate(all_cells[:8]):
-    cv2.imshow(f"bubble_{i+1:02d}", cell)
+myPixelVal = np.zeros((50,4))
+countC = 0
+countR = 0
+
+for image in all_cells:
+    total_pixels = cv2.countNonZero(image)
+    myPixelVal[countR][countC] = total_pixels
+    countC+=1
+    if countC == 4:
+        countR+=1
+        countC = 0
+print(myPixelVal)
+
+option_map = ['A', 'B', 'C', 'D']
+
+with open("omr_answers.txt", "w") as f:
+    for i in range(50):
+        ans_index = np.argmax(myPixelVal[i])
+        answer = option_map[ans_index]
+        f.write(f"Q{i+1}: {answer}\n")
+
+
 
 cv2.waitKey(0)
 cv2.destroyAllWindows()
