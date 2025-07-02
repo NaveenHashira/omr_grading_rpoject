@@ -60,7 +60,7 @@ print(myPixelVal)
 option_map = ['A', 'B', 'C', 'D']
 
 with open("omr_answers.txt", "w") as f:
-    for i in range(50):
+    for i in range(len(myPixelVal)):
         ans_index = np.argmax(myPixelVal[i])
         answer = option_map[ans_index]
         f.write(f"Q{i+1}: {answer}\n")
