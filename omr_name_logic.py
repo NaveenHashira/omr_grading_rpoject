@@ -70,8 +70,4 @@ for col in range(10):
 omr_id_str = ''.join(omr_id_digits)
 print("Detected OMR ID:", omr_id_str)
 
-
-
-
-
 cv2.waitKey(0)

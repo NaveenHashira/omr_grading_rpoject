@@ -14,3 +14,20 @@ def getNameContours(img):
         if area > 0.03 * img_area:
             return cnt  
     return None
+
+    contour_indices = [3, 4, 5]
+contour_names = ["top_left", "bottom_left", "top_right"]
+
+coordinates = {}  # Dictionary to store the (x, y) of each
+
+for idx, name in zip(contour_indices, contour_names):
+    contour = utils.get_third_largest_contour(thresh, idx)
+    x, y, w, h = cv2.boundingRect(contour)
+    coordinates[name] = (x, y)
+    cropped_region = canny[y:y+h, x:x+w]
+    
+    cv2.imshow(f"{name}_contour", cropped_region)
+
+print("Coordinates of contours (x, y):")
+for name, (x, y) in coordinates.items():
+    print(f"{name}: ({x}, {y})")
