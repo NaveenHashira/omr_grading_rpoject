@@ -43,21 +43,8 @@ num_rows_for_split = 4
 num_cols_for_split = 5
 bubbles_per_question_block = 4
 
-current_cropped_h, current_cropped_w = cropped.shape[:2]
-
-adjusted_cropped_h = (current_cropped_h // num_rows_for_split) * num_rows_for_split
-
-# This is the line that needs modification
-# The total horizontal split needed is num_cols_for_split * bubbles_per_question_block (which is 5 * 4 = 20)
-# So, the adjusted width must be perfectly divisible by this total
-adjusted_cropped_w = (current_cropped_w // (num_cols_for_split * bubbles_per_question_block)) * (num_cols_for_split * bubbles_per_question_block)
-
-final_image_for_split = cropped[0:adjusted_cropped_h, 0:adjusted_cropped_w]
-
-cv2.imshow("final_image_for_split", final_image_for_split)
-
 all_cells = []
-cells = utils.split_boxes_answer(final_image_for_split, num_rows_for_split, num_cols_for_split)
+cells = utils.split_boxes_answer(cropped, num_rows_for_split, num_cols_for_split)
 print("No of cells: ", len(cells))
 all_cells.extend(cells)
 
