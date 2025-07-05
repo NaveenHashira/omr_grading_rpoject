@@ -1,0 +1,16 @@
+if omr_id_contour is not None:
+    x, y, w, h = cv2.boundingRect(omr_id_contour)
+    omr_id_region = canny[y:y+h, x:x+w]
+    cv2.imshow("omr_id_region", omr_id_region)
+else:
+    print("OMR ID contour not found.")
+
+
+def getNameContours(img):
+    contours, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    img_area = img.shape[0] * img.shape[1]
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        if area > 0.03 * img_area:
+            return cnt  
+    return None

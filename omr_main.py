@@ -3,8 +3,7 @@ import numpy as np
 import utils  
 
 path = "OMR_ANSWER_KEY_page-0001.jpg"
-widthImg = 700
-heightImg = 600
+
 
 # Load image
 img = cv2.imread(path)
