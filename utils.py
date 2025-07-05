@@ -1,6 +1,25 @@
 import numpy as np
 import cv2
 
+def split_boxes_answer(img, num_rows, num_cols):
+    if img.shape[0] % num_rows != 0 or img.shape[1] % num_cols != 0:
+        raise ValueError("Image dimensions must be perfectly divisible by num_rows and num_cols for the initial split.")
+
+    rows = np.vsplit(img, num_rows)
+
+    single_bubbles = []
+    for r in rows:
+        question_blocks = np.hsplit(r, num_cols)
+
+        for block in question_blocks:
+            if block.shape[1] % 4 != 0:
+                raise ValueError(f"Individual question block width ({block.shape[1]}) is not divisible by 4 for splitting into bubbles.")
+            
+            bubbles_in_block = np.hsplit(block, 4)
+            single_bubbles.extend(bubbles_in_block)
+
+    return single_bubbles
+
 def get_rectangle_corners(thresh_img, get_contour_fn, canny_img=None, show=False):
     """
     Extracts rectangle corners from 3 known contours in a thresholded image.

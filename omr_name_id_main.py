@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import utils  # your custom utilities module
+import utils  
 
 def extract_omr_id_from_path(path):
     """
