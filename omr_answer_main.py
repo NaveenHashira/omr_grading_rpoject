@@ -127,9 +127,6 @@ def main():
     # --- 4. Determine Answers and Write to File ---
     with open(OUTPUT_ANSWER_FILENAME, "w") as f:
         for i in range(len(myPixelVal)):
-            # Determine the marked option: np.argmin if marked = less white pixels (e.g., inverted binary)
-            # np.argmax if marked = more white pixels (e.g., Canny edges on filled circles)
-            # Based on image_75e8e3.png (Canny), a filled circle would have more edges/white pixels.
             ans_index = np.argmax(myPixelVal[i]) 
             answer = OPTION_MAP[ans_index]
             f.write(f"Q{i+1}: {answer}\n")
