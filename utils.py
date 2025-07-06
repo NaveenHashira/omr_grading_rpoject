@@ -149,3 +149,104 @@ def showTopContours(img, original_img, top_n=4):
         cv2.waitKey(0)
         cv2.destroyWindow(f"Top {i+1} Contour")
 
+def split_omr_bubble_grid(cropped_bubble_region_img, q_num_crop_ratio=0.15):
+    if cropped_bubble_region_img is None or cropped_bubble_region_img.size == 0:
+        return None
+
+    img_height, img_width = cropped_bubble_region_img.shape[:2]
+
+    num_rows = 10
+    num_columns = 5
+
+    row_height = img_height // num_rows
+    col_width = img_width // num_columns
+
+    cropped_question_segments = []
+
+    for row_idx in range(num_rows):
+        row_segments = []
+        for col_idx in range(num_columns):
+            y_start = row_idx * row_height
+            y_end = y_start + row_height
+            x_start = col_idx * col_width
+            x_end = x_start + col_width
+
+            y_end = min(y_end, img_height)
+            x_end = min(x_end, img_width)
+
+            raw_segment = cropped_bubble_region_img[y_start:y_end, x_start:x_end]
+
+            if raw_segment.shape[1] == 0:
+                cropped_segment = raw_segment
+            else:
+                crop_pixels = int(raw_segment.shape[1] * q_num_crop_ratio)
+                cropped_segment = raw_segment[:, crop_pixels:]
+
+            row_segments.append(cropped_segment)
+        cropped_question_segments.append(row_segments)
+
+    return cropped_question_segments
+
+def split_question_into_options(question_segment_img):
+    if question_segment_img is None or question_segment_img.size == 0:
+        return []
+
+    seg_height, seg_width = question_segment_img.shape[:2]
+    num_options = 4 
+
+    option_width = seg_width // num_options
+    
+    option_segments = []
+    for i in range(num_options):
+        x_start = i * option_width
+        x_end = x_start + option_width
+
+        x_end = min(x_end, seg_width)
+
+        option_bubble = question_segment_img[:, x_start:x_end]
+        option_segments.append(option_bubble)
+
+    return option_segments
+
+def split_question_into_options(question_segment_img):
+    if question_segment_img is None or question_segment_img.size == 0:
+        return []
+    seg_height, seg_width = question_segment_img.shape[:2]
+    num_options = 4
+    option_width = seg_width // num_options
+    option_segments = []
+    for i in range(num_options):
+        x_start = i * option_width
+        x_end = x_start + option_width
+        x_end = min(x_end, seg_width)
+        option_bubble = question_segment_img[:, x_start:x_end]
+        option_segments.append(option_bubble)
+    return option_segments
+
+def split_and_crop_omr_bubbles(cropped_bubble_region_img, q_num_crop_ratio=0.15):
+    if cropped_bubble_region_img is None or cropped_bubble_region_img.size == 0:
+        return None
+    img_height, img_width = cropped_bubble_region_img.shape[:2]
+    num_rows = 10
+    num_columns = 5
+    row_height = img_height // num_rows
+    col_width = img_width // num_columns
+    cropped_question_segments = []
+    for row_idx in range(num_rows):
+        row_segments = []
+        for col_idx in range(num_columns):
+            y_start = row_idx * row_height
+            y_end = y_start + row_height
+            x_start = col_idx * col_width
+            x_end = x_start + col_width
+            y_end = min(y_end, img_height)
+            x_end = min(x_end, img_width)
+            raw_segment = cropped_bubble_region_img[y_start:y_end, x_start:x_end]
+            if raw_segment.shape[1] == 0:
+                cropped_segment = raw_segment
+            else:
+                crop_pixels = int(raw_segment.shape[1] * q_num_crop_ratio)
+                cropped_segment = raw_segment[:, crop_pixels:]
+            row_segments.append(cropped_segment)
+        cropped_question_segments.append(row_segments)
+    return cropped_question_segments

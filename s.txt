@@ -1,33 +1,90 @@
-if omr_id_contour is not None:
-    x, y, w, h = cv2.boundingRect(omr_id_contour)
-    omr_id_region = canny[y:y+h, x:x+w]
-    cv2.imshow("omr_id_region", omr_id_region)
+# Separate question numbers and answer letters
+question_numbers = []
+answer_letters = []
+for line in result:
+    text = line[1][0]
+    if text.isdigit():
+        question_numbers.append((int(text), line[0]))
+    elif len(text) == 1 and text.isalpha():
+        answer_letters.append((text, line[0]))
+
+# Sort question numbers by y-coordinate (top to bottom)
+question_numbers.sort(key=lambda x: x[1][0][1])
+
+# Preprocess image for bubble detection
+blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+# Detect bubbles using Hough Circle Transform
+circles = cv2.HoughCircles(blurred, cv2.HOUGH_GRADIENT, dp=1, minDist=20,
+                          param1=50, param2=30, minRadius=10, maxRadius=30)
+if circles is not None:
+    circles = np.round(circles[0, :]).astype("int")
 else:
-    print("OMR ID contour not found.")
+    circles = []
 
+# Define answer letters (assuming 4 options: A, B, C, D)
+letters = ['A', 'B', 'C', 'D']
 
-def getNameContours(img):
-    contours, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    img_area = img.shape[0] * img.shape[1]
-    for cnt in contours:
-        area = cv2.contourArea(cnt)
-        if area > 0.03 * img_area:
-            return cnt  
-    return None
+# Process each question
+for q_num, q_box in question_numbers:
+    # Calculate y-range for bubbles
+    y_coords = [point[1] for point in q_box]
+    y_min = min(y_coords)
+    y_max = max(y_coords)
+    y_center = (y_min + y_max) / 2
+    delta = (y_max - y_min) * 1.5  # Adjust multiplier if needed
+    q_x_max = max([point[0] for point in q_box])
 
-    contour_indices = [3, 4, 5]
-contour_names = ["top_left", "bottom_left", "top_right"]
+    # Find bubbles to the right of the question number within y-range
+    relevant_bubbles = [
+        (x, y, r) for x, y, r in circles
+        if y_center - delta < y < y_center + delta
+        and x > q_x_max
+    ]
+    relevant_bubbles.sort(key=lambda x: x[0])  # Sort by x-coordinate
 
-coordinates = {}  # Dictionary to store the (x, y) of each
+    # Check if we have the expected number of bubbles (e.g., 4)
+    if len(relevant_bubbles) == 4:
+        for i, bubble in enumerate(relevant_bubbles):
+            bx, by, br = bubble
+            # Extract bubble region
+            side = int(br * 1.5)  # Adjust size if needed
+            x_start = max(0, bx - side // 2)
+            y_start = max(0, by - side // 2)
+            x_end = min(image.shape[1], bx + side // 2)
+            y_end = min(image.shape[0], by + side // 2)
+            bubble_region = gray[y_start:y_end, x_start:x_end]
+            
+            # Check if bubble is filled
+            avg_intensity = np.mean(bubble_region)
+            if avg_intensity < 100:  # Adjust threshold based on image
+                print(f"Question {q_num}: Answer {letters[i]}")
+                break  # Move to next question after finding the answer
 
-for idx, name in zip(contour_indices, contour_names):
-    contour = utils.get_third_largest_contour(thresh, idx)
-    x, y, w, h = cv2.boundingRect(contour)
-    coordinates[name] = (x, y)
-    cropped_region = canny[y:y+h, x:x+w]
-    
-    cv2.imshow(f"{name}_contour", cropped_region)
+reader = easyocr.Reader(['en'], gpu=False)
+results = reader.readtext(cropped, allowlist='0123456789')
 
-print("Coordinates of contours (x, y):")
-for name, (x, y) in coordinates.items():
-    print(f"{name}: ({x}, {y})")
+output_img = cropped.copy()
+detected_numbers = []
+
+for (bbox,text,confidence) in results:
+    if confidence > 0.7:
+        detected_numbers.append(text)
+
+        # Draw bounding boxes and text on the original image (optional for visualization)
+        (top_left, top_right, bottom_right, bottom_left) = bbox
+        top_left = tuple(map(int, top_left))
+        bottom_right = tuple(map(int, bottom_right))
+
+        cv2.rectangle(output_img, top_left, bottom_right, (0, 255, 0), 2) # Green rectangle
+        cv2.putText(output_img, text, (top_left[0], top_left[1] - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2) # Red text
+
+print("Detected numbers:", detected_numbers)
+
+# Display the processed image (optional)
+plt.figure(figsize=(10, 8))
+plt.imshow(cv2.cvtColor(output_img, cv2.COLOR_BGR2RGB)) # Convert BGR to RGB for matplotlib
+plt.title("Image with Detected Numbers")
+plt.axis('off')
+plt.show()
