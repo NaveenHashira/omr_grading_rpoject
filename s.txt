@@ -1,90 +1,64 @@
-# Separate question numbers and answer letters
-question_numbers = []
-answer_letters = []
-for line in result:
-    text = line[1][0]
-    if text.isdigit():
-        question_numbers.append((int(text), line[0]))
-    elif len(text) == 1 and text.isalpha():
-        answer_letters.append((text, line[0]))
 
-# Sort question numbers by y-coordinate (top to bottom)
-question_numbers.sort(key=lambda x: x[1][0][1])
 
-# Preprocess image for bubble detection
-blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+def organize_questions(image_array):
+    if not isinstance(image_array, np.ndarray):
+        raise TypeError("Input must be a NumPy array.")
 
-# Detect bubbles using Hough Circle Transform
-circles = cv2.HoughCircles(blurred, cv2.HOUGH_GRADIENT, dp=1, minDist=20,
-                          param1=50, param2=30, minRadius=10, maxRadius=30)
-if circles is not None:
-    circles = np.round(circles[0, :]).astype("int")
-else:
-    circles = []
+    img_height, img_width = image_array.shape[:2]
 
-# Define answer letters (assuming 4 options: A, B, C, D)
-letters = ['A', 'B', 'C', 'D']
+    num_major_columns = 5
+    num_major_rows_per_column = 10
+    num_sub_columns_per_row = 4
 
-# Process each question
-for q_num, q_box in question_numbers:
-    # Calculate y-range for bubbles
-    y_coords = [point[1] for point in q_box]
-    y_min = min(y_coords)
-    y_max = max(y_coords)
-    y_center = (y_min + y_max) / 2
-    delta = (y_max - y_min) * 1.5  # Adjust multiplier if needed
-    q_x_max = max([point[0] for point in q_box])
+    major_col_width = img_width // num_major_columns
+    
+    row_height = img_height // num_major_rows_per_column
 
-    # Find bubbles to the right of the question number within y-range
-    relevant_bubbles = [
-        (x, y, r) for x, y, r in circles
-        if y_center - delta < y < y_center + delta
-        and x > q_x_max
-    ]
-    relevant_bubbles.sort(key=lambda x: x[0])  # Sort by x-coordinate
+    sub_col_width = major_col_width // num_sub_columns_per_row
 
-    # Check if we have the expected number of bubbles (e.g., 4)
-    if len(relevant_bubbles) == 4:
-        for i, bubble in enumerate(relevant_bubbles):
-            bx, by, br = bubble
-            # Extract bubble region
-            side = int(br * 1.5)  # Adjust size if needed
-            x_start = max(0, bx - side // 2)
-            y_start = max(0, by - side // 2)
-            x_end = min(image.shape[1], bx + side // 2)
-            y_end = min(image.shape[0], by + side // 2)
-            bubble_region = gray[y_start:y_end, x_start:x_end]
-            
-            # Check if bubble is filled
-            avg_intensity = np.mean(bubble_region)
-            if avg_intensity < 100:  # Adjust threshold based on image
-                print(f"Question {q_num}: Answer {letters[i]}")
-                break  # Move to next question after finding the answer
+    final_organized_list = []
+    question_number = 1
 
-reader = easyocr.Reader(['en'], gpu=False)
-results = reader.readtext(cropped, allowlist='0123456789')
+    for major_col_idx in range(num_major_columns):
+        for major_row_idx in range(num_major_rows_per_column):
+            for sub_col_idx in range(num_sub_columns_per_row):
+                y_start = major_row_idx * row_height
+                y_end = y_start + row_height
+                x_start = (major_col_idx * major_col_width) + (sub_col_idx * sub_col_width)
+                x_end = x_start + sub_col_width
+                                
+                if y_end > img_height:
+                    y_end = img_height
+                if x_end > img_width:
+                    x_end = img_width
 
-output_img = cropped.copy()
-detected_numbers = []
+                # Extract the cell
+                cell = image_array[y_start:y_end, x_start:x_end]
+                
+                final_organized_list.append((question_number, cell))
+                question_number += 1
+    
+    return final_organized_list
 
-for (bbox,text,confidence) in results:
-    if confidence > 0.7:
-        detected_numbers.append(text)
+all_cells = organize_questions(cropped)
 
-        # Draw bounding boxes and text on the original image (optional for visualization)
-        (top_left, top_right, bottom_right, bottom_left) = bbox
-        top_left = tuple(map(int, top_left))
-        bottom_right = tuple(map(int, bottom_right))
+myPixelVal = np.zeros((50, 4))
+countC = 0
+countR = 0
 
-        cv2.rectangle(output_img, top_left, bottom_right, (0, 255, 0), 2) # Green rectangle
-        cv2.putText(output_img, text, (top_left[0], top_left[1] - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2) # Red text
+for q_num, image_cell in all_cells:    
+    total_pixels = cv2.countNonZero(image_cell) 
+    myPixelVal[countR][countC] = total_pixels
+    countC += 1
+    if countC == 4:
+        countR += 1
+        countC = 0
+print(myPixelVal)
 
-print("Detected numbers:", detected_numbers)
+option_map = ['A', 'B', 'C', 'D']
 
-# Display the processed image (optional)
-plt.figure(figsize=(10, 8))
-plt.imshow(cv2.cvtColor(output_img, cv2.COLOR_BGR2RGB)) # Convert BGR to RGB for matplotlib
-plt.title("Image with Detected Numbers")
-plt.axis('off')
-plt.show()
+with open("omr_answers.txt", "w") as f:
+    for i in range(len(myPixelVal)):
+        ans_index = np.argmax(myPixelVal[i])
+        answer = option_map[ans_index]
+        f.write(f"Q{i+1}: {answer}\n")

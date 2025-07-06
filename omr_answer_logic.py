@@ -26,7 +26,7 @@ thresh = cv2.threshold(blur, 150, 255, cv2.THRESH_BINARY_INV)[1]
 #       cv2.imshow(f"{i+3}rd Largest Contour", img_contours)
 corners = utils.get_rectangle_corners(thresh,utils.get_third_largest_contour,canny,False)
 region = utils.crop_rectangle_region(canny, corners)
-cv2.imshow("region", region)
+#cv2.imshow("region", region)
 height, width = region.shape[:2]
 
 crop_x = int(0.03 * width)
@@ -35,57 +35,79 @@ crop_w = int(0.97 * width)
 crop_h = int(0.95 * height)
 
 cropped = region[crop_y:crop_y+crop_h, crop_x:crop_x+crop_w]
-cv2.imshow("Cropped Region", cropped)
 
-questions_no_q_num = utils.split_and_crop_omr_bubbles(cropped, q_num_crop_ratio=0.17)
+cv2.imshow("cropped",cropped)
 
-if questions_no_q_num is None or not questions_no_q_num:
-    print("Error: Could not segment questions.")
-    exit()
+cv2.waitKey(0)
 
+
+def organize_questions(image_array):
+    if not isinstance(image_array, np.ndarray):
+        raise TypeError("Input must be a NumPy array.")
+
+    img_height, img_width = image_array.shape[:2]
+
+    num_major_columns = 5
+    num_major_rows_per_column = 10
+    num_sub_columns_per_row = 4 # A, B, C, D
+
+    row_height = img_height // num_major_rows_per_column
+    
+    major_col_width = img_width // num_major_columns
+
+    single_bubble_width = major_col_width // num_sub_columns_per_row
+
+
+    final_organized_list = []
+
+    omr_question_counter = 1
+
+    for major_col_idx in range(num_major_columns):
+        for major_row_idx in range(num_major_rows_per_column):
+            
+            y_start_question_row = major_row_idx * row_height
+            y_end_question_row = y_start_question_row + row_height
+
+            # For each OMR question, we extract its 4 options (A, B, C, D)
+            question_bubbles = [] 
+
+            for sub_col_idx in range(num_sub_columns_per_row):
+                # Calculate the X coordinates for the current bubble within the OMR question
+                x_start_bubble = (major_col_idx * major_col_width) + (sub_col_idx * single_bubble_width)
+                x_end_bubble = x_start_bubble + single_bubble_width
+
+                y_end_question_row = min(y_end_question_row, img_height)
+                x_end_bubble = min(x_end_bubble, img_width)
+
+                
+                bubble_cell = image_array[y_start_question_row:y_end_question_row, x_start_bubble:x_end_bubble]
+                question_bubbles.append(bubble_cell)
+            
+
+            final_organized_list.append((omr_question_counter, question_bubbles))
+            omr_question_counter += 1 
+    
+    return final_organized_list
+
+
+
+
+all_cells = organize_questions(cropped)
 myPixelVal = np.zeros((50, 4))
-question_index = 0
 
-for row_of_questions in questions_no_q_num:
-    for question_segment in row_of_questions:
-        option_bubbles = utils.split_question_into_options(question_segment)
+for q_idx, (omr_question_num, bubble_images_list) in enumerate(all_cells):
+    
+    for option_idx, image_cell in enumerate(bubble_images_list):    
+        
+        total_pixels = cv2.countNonZero(image_cell)
+        myPixelVal[q_idx][option_idx] = total_pixels
 
-        if not option_bubbles or len(option_bubbles) != 4:
-            print(f"Warning: Question {question_index + 1} did not yield 4 option bubbles. Skipping.")
-            question_index += 1
-            continue
-
-        for option_idx, bubble_image in enumerate(option_bubbles):
-            if bubble_image is not None and bubble_image.size > 0:
-                total_pixels = cv2.countNonZero(bubble_image)
-                myPixelVal[question_index][option_idx] = total_pixels
-            else:
-                myPixelVal[question_index][option_idx] = 0
-
-        question_index += 1
-
-print("Calculated pixel values for each option:")
 print(myPixelVal)
 
 option_map = ['A', 'B', 'C', 'D']
-MIN_MARK_FILL_THRESHOLD = 70
 
 with open("omr_answers.txt", "w") as f:
-    for q_num_0_indexed in range(len(myPixelVal)):
-        current_q_pixel_counts = myPixelVal[q_num_0_indexed]
-        ans_index = np.argmin(current_q_pixel_counts)
-        max_pixel_count = current_q_pixel_counts[ans_index]
-        marked_options_indices = np.where(current_q_pixel_counts > MIN_MARK_FILL_THRESHOLD)[0]
-
-        if len(marked_options_indices) == 1:
-            answer = option_map[marked_options_indices[0]]
-        elif len(marked_options_indices) > 1:
-            answer = "MULTIPLE_MARKS"
-            print(f"Warning: Q{q_num_0_indexed + 1} has multiple marks. Pixel counts: {current_q_pixel_counts}")
-        else:
-            answer = "UNANSWERED"
-            print(f"Warning: Q{q_num_0_indexed + 1} is unanswered. Pixel counts: {current_q_pixel_counts}")
-
-        f.write(f"Q{q_num_0_indexed + 1}: {answer}\n")
-
-print("\nAnswers written to omr_answers.txt")
+    for i in range(len(myPixelVal)): 
+        ans_index = np.argmin(myPixelVal[i])
+        answer = option_map[ans_index]
+        f.write(f"Q{i+1}: {answer}\n")
