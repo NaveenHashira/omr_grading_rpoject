@@ -88,7 +88,7 @@ def main():
         print("Error: Could not find four corners for the OMR region.")
         return
 
-    region = utils.crop_rectangle_region(canny, corners) # Using Canny output for region
+    region = utils.crop_rectangle_region(canny, corners) 
 
     if region is None or region.size == 0:
         print("Error: Cropped region is empty or invalid.")
@@ -98,8 +98,8 @@ def main():
     height, width = region.shape[:2]
     crop_x = int(0.03 * width)
     crop_y = int(0.065 * height)
-    crop_w = int(0.97 * width) - crop_x # Calculate width from start to end
-    crop_h = int(0.95 * height) - crop_y # Calculate height from start to end
+    crop_w = int(0.97 * width) - crop_x 
+    crop_h = int(0.95 * height) - crop_y 
     
     # Ensure crop_w and crop_h are positive
     crop_w = max(1, crop_w)
